@@ -1,0 +1,66 @@
+server:
+  port: 8080
+
+zuul:
+  routes:
+    customers:
+      path: /customers/**
+      serviceId: CUSTOMER-SERVICE
+    accounts:
+      path: /accounts/**
+      serviceId: ACCOUNT-SERVICE
+    transactions:
+      path: /transactions/**
+      serviceId: TRANSACTION-SERVICE
+    notifications:
+      path: /notifications/**
+      serviceId: NOTIFICATION-SERVICE
+
+spring:
+  cloud:
+    discovery:
+      enabled: true
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: ACCOUNT-SERVICE
+          uri: lb://ACCOUNT-SERVICE
+          predicates:
+            - Path=/accounts/**
+          filters:
+
+        - id: CUSTOMER-SERVICE
+          uri: lb://CUSTOMER-SERVICE
+          predicates:
+            - Path=/customers/**
+
+        - id: TRANSACTION-SERVICE
+          uri: lb://TRANSACTION-SERVICE
+          predicates:
+            - Path=/transactions/**
+
+        - id: NOTIFICATION-SERVICE
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/notifications/**
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: gateway, health, info
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
