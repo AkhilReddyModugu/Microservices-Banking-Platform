@@ -53,13 +53,14 @@ public class AccountService implements AccountServiceImpl {
 
     // Get account by account number
     public AccountDTO getAccountByAccountNumber(String accountNumber) {
-        return convertToDTO(accountRepository.findAccountByAccountNumber(accountNumber));
+        Account account = accountRepository.findAccountByAccountNumber(accountNumber);
+        return account != null ? convertToDTO(account) : null;
     }
 
     // Create account
     public BankDto createAccount(AccountDTO accountDTO) {
-        if (accountRepository.existsAccountByAccountNumber(accountDTO.getAccountNumber())) {
-            return buildResponse(AccountUtils.ACCOUNT_EXISTS_CODE, AccountUtils.ACCOUNT_EXISTS_MESSAGE, accountDTO.getAccountNumber(), null, null);
+        if (accountRepository.existsAccountByCustomerId(accountDTO.getCustomerId())) {
+            return buildResponse(AccountUtils.ACCOUNT_EXISTS_CODE, AccountUtils.ACCOUNT_EXISTS_MESSAGE, null, null, null);
         }
 
         Account newAccount = accountRepository.save(Account.builder()
@@ -76,10 +77,6 @@ public class AccountService implements AccountServiceImpl {
                 .subject("Welcome to our Bank")
                 .body(buildAccountMessage(newAccount, AccountUtils.ACCOUNT_CREATION_CODE, AccountUtils.ACCOUNT_CREATION_MESSAGE))
                 .build());
-        System.out.println("Notification sent to queue");
-        //sending mail using synchronous communication
-//        sendNotification(customer.getEmail(), "Welcome to our Bank", buildAccountMessage(newAccount, AccountUtils.ACCOUNT_CREATION_CODE, AccountUtils.ACCOUNT_CREATION_MESSAGE));
-
         return buildResponse(AccountUtils.ACCOUNT_CREATION_CODE, AccountUtils.ACCOUNT_CREATION_MESSAGE, newAccount.getAccountNumber(), newAccount.getBalance(), customer.getFirstName()+ " " + customer.getLastName());
     }
 
@@ -99,17 +96,13 @@ public class AccountService implements AccountServiceImpl {
                 .subject("Account Deletion")
                 .body(buildAccountMessage(account, AccountUtils.ACCOUNT_DELETION_CODE, AccountUtils.ACCOUNT_DELETION_MESSAGE))
                 .build());
-        System.out.println("Notification sent to queue");
-
-        //sending mail using synchronous communication
-//        sendNotification(customer.getEmail(), "Account Deletion", buildAccountMessage(account, AccountUtils.ACCOUNT_DELETION_CODE, AccountUtils.ACCOUNT_DELETION_MESSAGE));
-
         return buildResponse(AccountUtils.ACCOUNT_DELETION_CODE, AccountUtils.ACCOUNT_DELETION_MESSAGE, null, null, null);
     }
 
     // Update account balance
     public String saveAccount(String accountNumber, BigDecimal balance) {
         Account account = accountRepository.findAccountByAccountNumber(accountNumber);
+        if (account == null) return "account not found";
         account.setBalance(balance);
         accountRepository.save(account);
         return "updated";

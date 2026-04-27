@@ -22,6 +22,7 @@ public class Account {
     private String accountNumber;
     private String accountType;
     private BigDecimal balance;
+    @Column(unique = true, nullable = false)
     private Long customerId;
     // Getters and Setters
 }

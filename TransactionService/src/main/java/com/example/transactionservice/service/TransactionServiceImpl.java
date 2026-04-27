@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -62,6 +61,12 @@ public class TransactionServiceImpl implements TransactionService {
     // Credit transaction
     public BankDto creditTransaction(TransactionDTO transactionDTO) {
         AccountDTO account = accountServiceClient.getAccountByAccountNumber(transactionDTO.getAccountNumber());
+        if (account == null) {
+            return BankDto.builder()
+                    .responseCode(TransactionUtils.ACCOUNT_NOT_EXISTS_CODE)
+                    .responseMessage(TransactionUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
+                    .build();
+        }
         account.setBalance(account.getBalance().add(transactionDTO.getAmount()));
 
         processTransaction(account, "CREDIT", transactionDTO.getAmount(), "credited by the user");
@@ -75,6 +80,12 @@ public class TransactionServiceImpl implements TransactionService {
     // Debit transaction
     public BankDto debitTransaction(TransactionDTO transactionDTO) {
         AccountDTO account = accountServiceClient.getAccountByAccountNumber(transactionDTO.getAccountNumber());
+        if (account == null) {
+            return BankDto.builder()
+                    .responseCode(TransactionUtils.ACCOUNT_NOT_EXISTS_CODE)
+                    .responseMessage(TransactionUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
+                    .build();
+        }
 
         if (account.getBalance().compareTo(transactionDTO.getAmount()) >= 0) {
             account.setBalance(account.getBalance().subtract(transactionDTO.getAmount()));
@@ -98,7 +109,14 @@ public class TransactionServiceImpl implements TransactionService {
         AccountDTO senderAccount = accountServiceClient.getAccountByAccountNumber(transferDTO.getFromAccount());
         AccountDTO recipientAccount = accountServiceClient.getAccountByAccountNumber(transferDTO.getToAccount());
 
-        if(Objects.equals(senderAccount, recipientAccount)){
+        if (senderAccount == null || recipientAccount == null) {
+            return BankDto.builder()
+                    .responseCode(TransactionUtils.ACCOUNT_NOT_EXISTS_CODE)
+                    .responseMessage(TransactionUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
+                    .build();
+        }
+
+        if(senderAccount.getAccountNumber().equals(recipientAccount.getAccountNumber())){
             return buildResponse(senderAccount, transferDTO.getAmount(),
                     TransactionUtils.SELF_TRANSACTION_CODE,
                     TransactionUtils.SELF_TRANSACTION_MESSAGE,
@@ -134,7 +152,7 @@ public class TransactionServiceImpl implements TransactionService {
         // Save transaction in the repository
         transactionRepository.save(Transaction.builder()
                 .accountNumber(account.getAccountNumber())
-                .amount(account.getBalance())
+                .amount(amount)
                 .message("Amount of " + amount + " has been " + message)
                 .transactionType(type)
                 .build());

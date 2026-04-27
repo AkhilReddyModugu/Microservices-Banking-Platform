@@ -62,14 +62,6 @@ public class CustomerServiceImpl implements CustomerImpl {
                 .body(buildCustomerMessage(accountDTO))
                 .build());
 
-
-        //sending mail using synchronous communication
-//        sendNotification(customer.getEmail(), "Customer Account Deletion",
-//                "Response Code = " + CustomerUtils.CUSTOMER_DELETION_CODE + "\n\n" +
-//                        "Response Message = " + CustomerUtils.CUSTOMER_DELETION_MESSAGE + "\n\n" +
-//                        "Account Details = Account Number:" + accountDTO.getAccountNumber() +
-//                        ", Account Balance: " + accountDTO.getBalance());
-
         customerRepository.deleteCustomerById(id);
 
         return buildResponse(CustomerUtils.CUSTOMER_DELETION_CODE, CustomerUtils.CUSTOMER_DELETION_MESSAGE, accountDTO, customer);
@@ -95,11 +87,6 @@ public class CustomerServiceImpl implements CustomerImpl {
                 .subject("Welcome to our Bank")
                 .body(buildCustomerMessage())
                 .build());
-
-        //sending mail using synchronous communication
-//        sendNotification(newCustomer.getEmail(), "Welcome to our Bank",
-//                "Response Code = " + CustomerUtils.CUSTOMER_CREATION_CODE + "\n\n" +
-//                        "Response Message = " + CustomerUtils.CUSTOMER_CREATION_MESSAGE);
 
         return buildResponse(CustomerUtils.CUSTOMER_CREATION_CODE, CustomerUtils.CUSTOMER_CREATION_MESSAGE, null, newCustomer);
     }

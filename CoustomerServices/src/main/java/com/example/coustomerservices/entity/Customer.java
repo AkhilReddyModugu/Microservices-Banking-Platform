@@ -28,6 +28,7 @@ public class Customer {
     private String gender;
     private String address;
     private String phoneNumber;
+    @Column(unique = true, nullable = false)
     private String email;
     @CreationTimestamp
     private LocalDateTime createdAt;

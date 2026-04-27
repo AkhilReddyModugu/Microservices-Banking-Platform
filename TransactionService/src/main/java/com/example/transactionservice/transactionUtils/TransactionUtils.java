@@ -24,4 +24,7 @@ public class TransactionUtils {
 
     public static final String MINIMUM_TRANSACTION_AMOUNT_CODE = "027";
     public static final String MINIMUM_TRANSACTION_AMOUNT_MESSAGE = "MINIMUM TRANSACTION AMOUNT";
+
+    public static final String ACCOUNT_NOT_EXISTS_CODE = "028";
+    public static final String ACCOUNT_NOT_EXISTS_MESSAGE = "ACCOUNT NOT FOUND";
 }

@@ -30,13 +30,13 @@ public class CustomerController {
 
     //customer creation
     @PostMapping
-    public BankDto createCustomer(@RequestBody CustomerDTO customerDTO) {
-        return customerService.createAccount(customerDTO);
+    public ResponseEntity<BankDto> createCustomer(@RequestBody CustomerDTO customerDTO) {
+        return ResponseEntity.ok(customerService.createAccount(customerDTO));
     }
 
     //customer deletion
     @DeleteMapping("/{id}")
-    public BankDto deleteCustomer(@PathVariable Long id) {
-        return customerService.deleteCustomer(id);
+    public ResponseEntity<BankDto> deleteCustomer(@PathVariable Long id) {
+        return ResponseEntity.ok(customerService.deleteCustomer(id));
     }
 }
