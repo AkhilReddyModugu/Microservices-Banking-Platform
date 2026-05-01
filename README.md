@@ -39,11 +39,11 @@ API Gateway and Feign clients look up service addresses dynamically — no hardc
 
 Single entry point for all client requests. Routes traffic based on path:
 
-| Path | Routed To |
-|---|---|
-| `/customers/**` | Customer Service |
-| `/accounts/**` | Account Service |
-| `/transactions/**` | Transaction Service |
+| Path                | Routed To            |
+| ------------------- | -------------------- |
+| `/customers/**`     | Customer Service     |
+| `/accounts/**`      | Account Service      |
+| `/transactions/**`  | Transaction Service  |
 | `/notifications/**` | Notification Service |
 
 Uses `lb://` (load-balanced) routing via Eureka.
@@ -54,12 +54,12 @@ Uses `lb://` (load-balanced) routing via Eureka.
 
 Manages customer profiles.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/customers` | Get all customers |
-| GET | `/customers/{id}` | Get customer by ID |
-| POST | `/customers` | Create new customer |
-| DELETE | `/customers/{id}` | Delete customer |
+| Method | Endpoint          | Description         |
+| ------ | ----------------- | ------------------- |
+| GET    | `/customers`      | Get all customers   |
+| GET    | `/customers/{id}` | Get customer by ID  |
+| POST   | `/customers`      | Create new customer |
+| DELETE | `/customers/{id}` | Delete customer     |
 
 - **On create:** publishes a welcome notification event to RabbitMQ.
 - **On delete:** calls Account Service via Feign to delete the associated account, then publishes a deletion notification.
@@ -70,15 +70,15 @@ Manages customer profiles.
 
 Manages bank accounts.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/accounts` | Get all accounts |
-| GET | `/accounts/{id}` | Get account by ID |
-| GET | `/accounts/customer/{id}` | Get account by customer ID |
-| GET | `/accounts/account/{accountNumber}` | Get account by account number |
-| POST | `/accounts` | Create new account |
-| PUT | `/accounts/update` | Update account balance |
-| DELETE | `/accounts/{accountNumber}` | Delete account |
+| Method | Endpoint                            | Description                   |
+| ------ | ----------------------------------- | ----------------------------- |
+| GET    | `/accounts`                         | Get all accounts              |
+| GET    | `/accounts/{id}`                    | Get account by ID             |
+| GET    | `/accounts/customer/{id}`           | Get account by customer ID    |
+| GET    | `/accounts/account/{accountNumber}` | Get account by account number |
+| POST   | `/accounts`                         | Create new account            |
+| PUT    | `/accounts/update`                  | Update account balance        |
+| DELETE | `/accounts/{accountNumber}`         | Delete account                |
 
 - **On create/delete:** calls Customer Service via Feign to get customer details, then publishes a notification event to RabbitMQ.
 
@@ -88,16 +88,17 @@ Manages bank accounts.
 
 Handles all financial operations.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/transactions` | Get all transactions |
-| GET | `/transactions/account/{accountNumber}` | Get by account number |
-| GET | `/transactions/transaction/{type}` | Get by type (`CREDIT` / `DEBIT`) |
-| POST | `/transactions/credit-transfer` | Credit an account |
-| POST | `/transactions/debit-transfer` | Debit an account |
-| POST | `/transactions/transfer` | Transfer between two accounts |
+| Method | Endpoint                                | Description                      |
+| ------ | --------------------------------------- | -------------------------------- |
+| GET    | `/transactions`                         | Get all transactions             |
+| GET    | `/transactions/account/{accountNumber}` | Get by account number            |
+| GET    | `/transactions/transaction/{type}`      | Get by type (`CREDIT` / `DEBIT`) |
+| POST   | `/transactions/credit-transfer`         | Credit an account                |
+| POST   | `/transactions/debit-transfer`          | Debit an account                 |
+| POST   | `/transactions/transfer`                | Transfer between two accounts    |
 
 **Business rules enforced:**
+
 - Debit and transfer are rejected if balance is insufficient.
 - Transfer is rejected if sender and receiver are the same account.
 - Transfer enforces a minimum amount of ₹10.
@@ -109,9 +110,9 @@ Handles all financial operations.
 
 Listens to RabbitMQ and sends emails.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/notifications/send` | Send notification directly (sync) |
+| Method | Endpoint              | Description                       |
+| ------ | --------------------- | --------------------------------- |
+| POST   | `/notifications/send` | Send notification directly (sync) |
 
 - Consumes messages from the RabbitMQ queue automatically.
 - Validates email format before sending.
@@ -122,18 +123,18 @@ Listens to RabbitMQ and sends emails.
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Language | Java 17 |
-| Framework | Spring Boot 3.3 |
-| Service Discovery | Netflix Eureka |
-| API Gateway | Spring Cloud Gateway |
-| Inter-service calls | OpenFeign |
-| Async messaging | RabbitMQ |
-| Database | MySQL 8 |
-| ORM | Spring Data JPA / Hibernate |
-| Build tool | Maven |
-| API Docs | SpringDoc OpenAPI (Swagger UI) |
+| Layer               | Technology                     |
+| ------------------- | ------------------------------ |
+| Language            | Java 17                        |
+| Framework           | Spring Boot 3.3                |
+| Service Discovery   | Netflix Eureka                 |
+| API Gateway         | Spring Cloud Gateway           |
+| Inter-service calls | OpenFeign                      |
+| Async messaging     | RabbitMQ                       |
+| Database            | MySQL 8                        |
+| ORM                 | Spring Data JPA / Hibernate    |
+| Build tool          | Maven                          |
+| API Docs            | SpringDoc OpenAPI (Swagger UI) |
 
 ---
 
@@ -233,7 +234,7 @@ BankFlow/
 Create these databases in MySQL before starting the services:
 
 ```sql
-CREATE DATABASE customers_db;
+CREATE DATABASE customer_db;
 CREATE DATABASE accounts_db;
 CREATE DATABASE transaction_db;
 CREATE DATABASE notification_db;
@@ -243,37 +244,41 @@ Tables are created automatically by Hibernate on first startup (`ddl-auto: updat
 
 ---
 
+## Environment Variables
+
+Credentials are not hardcoded. Set these environment variables before running the services:
+
+```bash
+export DB_PASSWORD=your_mysql_password
+export MAIL_USERNAME=your_email@gmail.com
+export MAIL_PASSWORD=your_gmail_app_password
+```
+
+To make these permanent on Mac, add them to `~/.zshrc` and run `source ~/.zshrc`.
+
+> For Gmail, generate an **App Password** from Google Account → Security → App Passwords (requires 2FA enabled). Use the 16-character code as `MAIL_PASSWORD`.
+
+---
+
 ## Configuration
 
-Each service has its own `application.yml`. Update the following before running:
+Each service reads credentials from environment variables. The relevant config entries are:
 
-**Database** (all services except Eureka and Gateway):
+**Database** (`application.yml` in all services except Eureka and Gateway):
 
 ```yaml
 spring:
   datasource:
-    username: your_mysql_username
-    password: your_mysql_password
+    username: root
+    password: ${DB_PASSWORD}
 ```
 
-**Email** (Notification Service):
+**Email** (`application.properties` in Notification Service):
 
-```yaml
-spring:
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: your_email@gmail.com
-    password: your_app_password
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+```properties
+spring.mail.username=${MAIL_USERNAME}
+spring.mail.password=${MAIL_PASSWORD}
 ```
-
-> For Gmail, generate an **App Password** from your Google account settings (requires 2FA to be enabled).
 
 ---
 
@@ -282,37 +287,44 @@ spring:
 Start services **in this order** — each depends on the one before it:
 
 **1. Eureka Server**
+
 ```bash
 cd Eureka-server
 mvn spring-boot:run
 ```
+
 Verify: http://localhost:8761
 
 **2. API Gateway**
+
 ```bash
 cd Api-gateway
 mvn spring-boot:run
 ```
 
 **3. Customer Service**
+
 ```bash
 cd CoustomerServices
 mvn spring-boot:run
 ```
 
 **4. Account Service**
+
 ```bash
 cd Accountservices
 mvn spring-boot:run
 ```
 
 **5. Transaction Service**
+
 ```bash
 cd TransactionService
 mvn spring-boot:run
 ```
 
 **6. Notification Service**
+
 ```bash
 cd Notification-Service
 mvn spring-boot:run
@@ -329,6 +341,7 @@ All requests go through the gateway at **http://localhost:8080**
 All requests go to port `8080` (gateway). Use Postman or curl.
 
 **Create a customer**
+
 ```http
 POST http://localhost:8080/customers
 Content-Type: application/json
@@ -344,6 +357,7 @@ Content-Type: application/json
 ```
 
 **Create an account**
+
 ```http
 POST http://localhost:8080/accounts
 Content-Type: application/json
@@ -355,6 +369,7 @@ Content-Type: application/json
 ```
 
 **Transfer money**
+
 ```http
 POST http://localhost:8080/transactions/transfer
 Content-Type: application/json
@@ -367,6 +382,7 @@ Content-Type: application/json
 ```
 
 **Get transaction history**
+
 ```http
 GET http://localhost:8080/transactions/account/ACC1716234567890
 ```
@@ -380,11 +396,12 @@ Account Service exposes interactive API docs at:
 
 ---
 
-## Planned Enhancements
+## Potential Enhancements
 
 - [ ] Spring Security with JWT authentication
-- [ ] Replace RabbitMQ with Apache Kafka
-- [ ] React + Redux frontend dashboard
+- [ ] Input validation on request DTOs
+- [ ] Global exception handling across all services
+- [ ] Resilience4j circuit breakers on Feign clients
+- [ ] Caffeine caching for customer data in Transaction Service
+- [ ] Pagination on list endpoints
 - [ ] Docker + docker-compose for one-command startup
-- [ ] Kubernetes deployment on AWS EC2
-- [ ] GitHub Actions CI/CD pipeline
