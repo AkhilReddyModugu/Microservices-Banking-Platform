@@ -1,0 +1,174 @@
+services:
+
+  # ─────────────────────────────────────────
+  # MySQL — single container, 4 databases
+  # init.sql creates all databases on first run
+  # ─────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: bankflow-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_HOST: '%'
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─────────────────────────────────────────
+  # RabbitMQ — with management UI on 15672
+  # ─────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: bankflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ─────────────────────────────────────────
+  # Eureka Server — service registry
+  # all other services register here
+  # ─────────────────────────────────────────
+  eureka-server:
+    build: ./Eureka-server
+    container_name: bankflow-eureka
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # ─────────────────────────────────────────
+  # API Gateway — single entry point on 8080
+  # waits for Eureka to be healthy first
+  # ─────────────────────────────────────────
+  api-gateway:
+    build: ./Api-gateway
+    container_name: bankflow-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    restart: on-failure
+
+  # ─────────────────────────────────────────
+  # Customer Service — port 8002
+  # ─────────────────────────────────────────
+  customer-service:
+    build: ./CoustomerServices
+    container_name: bankflow-customer
+    ports:
+      - "8002:8002"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/customer_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFERIPADDRESS: true
+    restart: on-failure
+
+  # ─────────────────────────────────────────
+  # Account Service — port 8001
+  # ─────────────────────────────────────────
+  account-service:
+    build: ./Accountservices
+    container_name: bankflow-account
+    ports:
+      - "8001:8001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/accounts_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFERIPADDRESS: true
+    restart: on-failure
+
+  # ─────────────────────────────────────────
+  # Transaction Service — port 8003
+  # ─────────────────────────────────────────
+  transaction-service:
+    build: ./TransactionService
+    container_name: bankflow-transaction
+    ports:
+      - "8003:8003"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/transaction_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFERIPADDRESS: true
+    restart: on-failure
+
+  # ─────────────────────────────────────────
+  # Notification Service — port 8004
+  # ─────────────────────────────────────────
+  notification-service:
+    build: ./Notification-Service
+    container_name: bankflow-notification
+    ports:
+      - "8004:8004"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/notification_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFERIPADDRESS: true
+    restart: on-failure
+
+# ─────────────────────────────────────────
+# Named volume — MySQL data persists across
+# container restarts
+# ─────────────────────────────────────────
+volumes:
+  mysql-data:

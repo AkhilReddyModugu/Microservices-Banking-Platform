@@ -1,0 +1,10 @@
+# Credentials — never commit this
+.env
+
+# Maven build output
+**/target/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
