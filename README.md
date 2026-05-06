@@ -178,8 +178,8 @@ Account Service ──publishes──▶ RabbitMQ Exchange
 BankFlow/
 ├── Eureka-server/
 ├── Api-gateway/
-├── CoustomerServices/
-│   └── src/main/java/com/example/coustomerservices/
+├── CustomerServices/
+│   └── src/main/java/com/example/customerservices/
 │       ├── controller/
 │       ├── service/
 │       ├── Repo/
@@ -305,7 +305,7 @@ mvn spring-boot:run
 **3. Customer Service**
 
 ```bash
-cd CoustomerServices
+cd CustomerServices
 mvn spring-boot:run
 ```
 

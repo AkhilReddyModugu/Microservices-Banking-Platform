@@ -72,7 +72,7 @@ services:
   # Customer Service — port 8002
   # ─────────────────────────────────────────
   customer-service:
-    build: ./CoustomerServices
+    build: ./CustomerServices
     container_name: bankflow-customer
     ports:
       - "8002:8002"
