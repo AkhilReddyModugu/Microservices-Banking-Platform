@@ -222,6 +222,10 @@ BankFlow/
 
 ## Prerequisites
 
+**To run with Docker (recommended):**
+- Docker Desktop
+
+**To run manually:**
 - Java 17
 - Maven 3.8+
 - MySQL 8
@@ -229,7 +233,7 @@ BankFlow/
 
 ---
 
-## Database Setup
+## Database Setup (manual run only)
 
 Create these databases in MySQL before starting the services:
 
@@ -241,6 +245,7 @@ CREATE DATABASE notification_db;
 ```
 
 Tables are created automatically by Hibernate on first startup (`ddl-auto: update`).
+When running with Docker, databases are created automatically via `init.sql`.
 
 ---
 
@@ -284,53 +289,61 @@ spring.mail.password=${MAIL_PASSWORD}
 
 ## Running the Project
 
-Start services **in this order** — each depends on the one before it:
+### Option 1 — Docker (recommended)
 
-**1. Eureka Server**
-
+**1. Create your `.env` file:**
 ```bash
-cd Eureka-server
-mvn spring-boot:run
+cp .env.example .env
+```
+Fill in your credentials in `.env`:
+```
+DB_PASSWORD=your_mysql_password
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_gmail_app_password
 ```
 
-Verify: http://localhost:8761
-
-**2. API Gateway**
-
+**2. Start everything:**
 ```bash
-cd Api-gateway
-mvn spring-boot:run
+docker-compose up -d --build
 ```
 
-**3. Customer Service**
+All services start automatically in the correct order. First run takes 5-10 minutes while Maven downloads dependencies inside Docker.
 
+**3. Verify:**
+Open http://localhost:8761 — all 4 services should appear as UP.
+
+**Useful Docker commands:**
 ```bash
-cd CustomerServices
-mvn spring-boot:run
+docker-compose up -d          # start in background
+docker-compose down           # stop (data preserved)
+docker-compose down -v        # stop and wipe all data
+docker logs -f bankflow-transaction   # live logs for a service
+docker ps                     # check container status
 ```
 
-**4. Account Service**
+---
 
+### Option 2 — Manual
+
+Set environment variables first:
 ```bash
-cd Accountservices
-mvn spring-boot:run
+export DB_PASSWORD=your_mysql_password
+export MAIL_USERNAME=your_email@gmail.com
+export MAIL_PASSWORD=your_gmail_app_password
 ```
 
-**5. Transaction Service**
+Start services **in this order**, each in a separate terminal:
 
 ```bash
-cd TransactionService
-mvn spring-boot:run
+cd Eureka-server && mvn spring-boot:run       # wait for startup
+cd Api-gateway && mvn spring-boot:run
+cd CustomerServices && mvn spring-boot:run
+cd Accountservices && mvn spring-boot:run
+cd TransactionService && mvn spring-boot:run
+cd Notification-Service && mvn spring-boot:run
 ```
 
-**6. Notification Service**
-
-```bash
-cd Notification-Service
-mvn spring-boot:run
-```
-
-After all services start, they will all appear registered at: http://localhost:8761
+After all services start, verify at http://localhost:8761
 
 All requests go through the gateway at **http://localhost:8080**
 
@@ -404,4 +417,3 @@ Account Service exposes interactive API docs at:
 - [ ] Resilience4j circuit breakers on Feign clients
 - [ ] Caffeine caching for customer data in Transaction Service
 - [ ] Pagination on list endpoints
-- [ ] Docker + docker-compose for one-command startup
