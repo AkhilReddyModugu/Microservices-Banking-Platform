@@ -7,6 +7,8 @@ import com.example.transactionservice.feignconfig.AccountServiceClient;
 import com.example.transactionservice.feignconfig.CustomerServiceClient;
 import com.example.transactionservice.service.impli.TransactionService;
 import com.example.transactionservice.transactionUtils.TransactionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class TransactionServiceImpl implements TransactionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionServiceImpl.class);
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -62,15 +66,15 @@ public class TransactionServiceImpl implements TransactionService {
     public BankDto creditTransaction(TransactionDTO transactionDTO) {
         AccountDTO account = accountServiceClient.getAccountByAccountNumber(transactionDTO.getAccountNumber());
         if (account == null) {
+            log.warn("Credit failed — account not found: {}", transactionDTO.getAccountNumber());
             return BankDto.builder()
                     .responseCode(TransactionUtils.ACCOUNT_NOT_EXISTS_CODE)
                     .responseMessage(TransactionUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
                     .build();
         }
         account.setBalance(account.getBalance().add(transactionDTO.getAmount()));
-
         processTransaction(account, "CREDIT", transactionDTO.getAmount(), "credited by the user");
-
+        log.info("Credit completed: accountNumber={}, amount={}", transactionDTO.getAccountNumber(), transactionDTO.getAmount());
         return buildResponse(account, transactionDTO.getAmount(),
                 TransactionUtils.CREDIT_TRANSACTION_COMPLETED_CODE,
                 TransactionUtils.CREDIT_TRANSACTION_COMPLETED_MESSAGE,
@@ -81,6 +85,7 @@ public class TransactionServiceImpl implements TransactionService {
     public BankDto debitTransaction(TransactionDTO transactionDTO) {
         AccountDTO account = accountServiceClient.getAccountByAccountNumber(transactionDTO.getAccountNumber());
         if (account == null) {
+            log.warn("Debit failed — account not found: {}", transactionDTO.getAccountNumber());
             return BankDto.builder()
                     .responseCode(TransactionUtils.ACCOUNT_NOT_EXISTS_CODE)
                     .responseMessage(TransactionUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
@@ -89,15 +94,16 @@ public class TransactionServiceImpl implements TransactionService {
 
         if (account.getBalance().compareTo(transactionDTO.getAmount()) >= 0) {
             account.setBalance(account.getBalance().subtract(transactionDTO.getAmount()));
-
             processTransaction(account, "DEBIT", transactionDTO.getAmount(), "debited by user");
-
+            log.info("Debit completed: accountNumber={}, amount={}", transactionDTO.getAccountNumber(), transactionDTO.getAmount());
             return buildResponse(account, transactionDTO.getAmount(),
                     TransactionUtils.DEBIT_TRANSACTION_COMPLETED_CODE,
                     TransactionUtils.DEBIT_TRANSACTION_COMPLETED_MESSAGE,
                     "Withdrawal done successfully");
         }
 
+        log.warn("Debit failed — insufficient balance: accountNumber={}, balance={}, requested={}",
+                transactionDTO.getAccountNumber(), account.getBalance(), transactionDTO.getAmount());
         return buildResponse(account, transactionDTO.getAmount(),
                 TransactionUtils.DEBIT_TRANSACTION_FAILED_CODE,
                 TransactionUtils.DEBIT_TRANSACTION_FAILED_MESSAGE,
@@ -110,19 +116,22 @@ public class TransactionServiceImpl implements TransactionService {
         AccountDTO recipientAccount = accountServiceClient.getAccountByAccountNumber(transferDTO.getToAccount());
 
         if (senderAccount == null || recipientAccount == null) {
+            log.warn("Transfer failed — account not found: from={}, to={}", transferDTO.getFromAccount(), transferDTO.getToAccount());
             return BankDto.builder()
                     .responseCode(TransactionUtils.ACCOUNT_NOT_EXISTS_CODE)
                     .responseMessage(TransactionUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
                     .build();
         }
 
-        if(senderAccount.getAccountNumber().equals(recipientAccount.getAccountNumber())){
+        if (senderAccount.getAccountNumber().equals(recipientAccount.getAccountNumber())) {
+            log.warn("Transfer failed — self-transfer attempted: accountNumber={}", transferDTO.getFromAccount());
             return buildResponse(senderAccount, transferDTO.getAmount(),
                     TransactionUtils.SELF_TRANSACTION_CODE,
                     TransactionUtils.SELF_TRANSACTION_MESSAGE,
                     "cannot do self transfer, use different account number.");
         }
-        if(transferDTO.getAmount().compareTo(BigDecimal.TEN)<0){
+        if (transferDTO.getAmount().compareTo(BigDecimal.TEN) < 0) {
+            log.warn("Transfer failed — below minimum amount: amount={}", transferDTO.getAmount());
             return buildResponse(senderAccount, transferDTO.getAmount(),
                     TransactionUtils.MINIMUM_TRANSACTION_AMOUNT_CODE,
                     TransactionUtils.MINIMUM_TRANSACTION_AMOUNT_MESSAGE,
@@ -135,12 +144,15 @@ public class TransactionServiceImpl implements TransactionService {
             processTransaction(senderAccount, "DEBIT", transferDTO.getAmount(), "sent to " + recipientAccount.getAccountNumber());
             processTransaction(recipientAccount, "CREDIT", transferDTO.getAmount(), "received from " + senderAccount.getAccountNumber());
 
+            log.info("Transfer completed: from={}, to={}, amount={}", transferDTO.getFromAccount(), transferDTO.getToAccount(), transferDTO.getAmount());
             return buildResponse(senderAccount, transferDTO.getAmount(),
                     TransactionUtils.TRANSACTION_COMPLETED_CODE,
                     TransactionUtils.TRANSACTION_COMPLETED_MESSAGE,
                     "Amount transferred to receiver");
         }
 
+        log.warn("Transfer failed — insufficient balance: from={}, balance={}, requested={}",
+                transferDTO.getFromAccount(), senderAccount.getBalance(), transferDTO.getAmount());
         return buildResponse(senderAccount, senderAccount.getBalance(),
                 TransactionUtils.LOW_BALANCE_CODE + " AND " + TransactionUtils.TRANSACTION_FAILED_CODE,
                 TransactionUtils.LOW_BALANCE_MESSAGE + ", " + TransactionUtils.TRANSACTION_FAILED_MESSAGE,

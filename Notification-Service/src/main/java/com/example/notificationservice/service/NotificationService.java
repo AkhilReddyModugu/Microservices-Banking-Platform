@@ -3,6 +3,8 @@ package com.example.notificationservice.service;
 import com.example.notificationservice.Repo.NotificationRepository;
 import com.example.notificationservice.dto.NotificationDTO;
 import com.example.notificationservice.entity.Notification;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,8 @@ import java.util.regex.Matcher;
 
 @Service
 public class NotificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
     @Autowired
     private JavaMailSender mailSender;
@@ -37,14 +41,15 @@ public class NotificationService {
 
     @RabbitListener(queues = {"${account.queue.json.name}"})
     public void handleNotification(NotificationDTO notificationDTO) {
-
-        String message=sendNotification(notificationDTO);
-        System.out.println("Received notification message: " + message);
+        log.info("Notification received from queue for: {}", notificationDTO.getReceiver());
+        String message = sendNotification(notificationDTO);
+        log.info("Notification result: {}", message);
     }
 
     //notification sending
     public String sendNotification(NotificationDTO notificationDTO) {
         if (!isValidEmailFormat(notificationDTO.getReceiver())) {
+            log.warn("Invalid email format — skipping notification: {}", notificationDTO.getReceiver());
             return "Invalid email format please check the email.";
         }
 
@@ -54,6 +59,7 @@ public class NotificationService {
         message.setSubject(notificationDTO.getSubject());
         message.setText(notificationDTO.getBody());
         mailSender.send(message);
+        log.info("Email sent to: {}, subject: {}", notificationDTO.getReceiver(), notificationDTO.getSubject());
         saveNotification(notificationDTO);
         return "notification has been sent successfully.";
     }

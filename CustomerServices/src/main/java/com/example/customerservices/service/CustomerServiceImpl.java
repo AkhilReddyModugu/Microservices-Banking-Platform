@@ -7,6 +7,8 @@ import com.example.customerservices.entity.Customer;
 import com.example.customerservices.feignconfig.AccountServiceClient;
 import com.example.customerservices.service.impli.CustomerImpl;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +19,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class CustomerServiceImpl implements CustomerImpl {
+
+    private static final Logger log = LoggerFactory.getLogger(CustomerServiceImpl.class);
 
     @Autowired
     public RabbitTemplate rabbitTemplate;
@@ -47,6 +51,7 @@ public class CustomerServiceImpl implements CustomerImpl {
     @Transactional
     public BankDto deleteCustomer(Long id) {
         if (!customerRepository.existsById(id)) {
+            log.warn("Delete failed — customer not found: id={}", id);
             return buildResponse(CustomerUtils.CUSTOMER_NOT_EXISTS_CODE, CustomerUtils.CUSTOMER_NOT_EXISTS_MESSAGE, null, null);
         }
 
@@ -54,7 +59,7 @@ public class CustomerServiceImpl implements CustomerImpl {
         AccountDTO accountDTO = accountServiceClient.getAccountByCustomerId(customer.getId());
         if(accountDTO != null) {
             accountServiceClient.deleteAccount(accountDTO.getAccountNumber());
-
+            log.info("Account deleted for customerId={}: accountNumber={}", id, accountDTO.getAccountNumber());
         }
         rabbitTemplate.convertAndSend(EXCHANGE_NAME, JSON_ROUTING_KEY, NotificationDTO.builder()
                 .receiver(customer.getEmail())
@@ -63,6 +68,7 @@ public class CustomerServiceImpl implements CustomerImpl {
                 .build());
 
         customerRepository.deleteCustomerById(id);
+        log.info("Customer deleted: id={}, email={}", id, customer.getEmail());
 
         return buildResponse(CustomerUtils.CUSTOMER_DELETION_CODE, CustomerUtils.CUSTOMER_DELETION_MESSAGE, accountDTO, customer);
     }
@@ -70,6 +76,7 @@ public class CustomerServiceImpl implements CustomerImpl {
     @Override
     public BankDto createAccount(CustomerDTO customerDTO) {
         if (customerRepository.existsByEmail(customerDTO.getEmail())) {
+            log.warn("Registration failed — email already exists: {}", customerDTO.getEmail());
             return buildResponse(CustomerUtils.CUSTOMER_EXISTS_CODE, CustomerUtils.CUSTOMER_EXISTS_MESSAGE, null, null);
         }
 
@@ -81,6 +88,8 @@ public class CustomerServiceImpl implements CustomerImpl {
                 .phoneNumber(customerDTO.getPhoneNumber())
                 .email(customerDTO.getEmail())
                 .build());
+
+        log.info("Customer created: id={}, email={}", newCustomer.getId(), newCustomer.getEmail());
 
         rabbitTemplate.convertAndSend(EXCHANGE_NAME, JSON_ROUTING_KEY, NotificationDTO.builder()
                 .receiver(newCustomer.getEmail())

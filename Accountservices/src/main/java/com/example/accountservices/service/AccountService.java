@@ -7,6 +7,8 @@ import com.example.accountservices.accountUtils.AccountUtils;
 import com.example.accountservices.feignconfig.CustomerServiceClient;
 import com.example.accountservices.service.impli.AccountServiceImpl;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class AccountService implements AccountServiceImpl {
+
+    private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -60,6 +64,7 @@ public class AccountService implements AccountServiceImpl {
     // Create account
     public BankDto createAccount(AccountDTO accountDTO) {
         if (accountRepository.existsAccountByCustomerId(accountDTO.getCustomerId())) {
+            log.warn("Account creation failed — account already exists for customerId={}", accountDTO.getCustomerId());
             return buildResponse(AccountUtils.ACCOUNT_EXISTS_CODE, AccountUtils.ACCOUNT_EXISTS_MESSAGE, null, null, null);
         }
 
@@ -69,6 +74,8 @@ public class AccountService implements AccountServiceImpl {
                 .balance(BigDecimal.ZERO)
                 .customerId(accountDTO.getCustomerId())
                 .build());
+
+        log.info("Account created: accountNumber={}, customerId={}", newAccount.getAccountNumber(), newAccount.getCustomerId());
 
         CustomerDTO customer = customerServiceClient.getCustomerById(newAccount.getCustomerId());
 
@@ -84,11 +91,14 @@ public class AccountService implements AccountServiceImpl {
     @Transactional
     public BankDto deleteAccount(String accountNumber) {
         if (!accountRepository.existsAccountByAccountNumber(accountNumber)) {
+            log.warn("Account deletion failed — account not found: {}", accountNumber);
             return buildResponse(AccountUtils.ACCOUNT_NOT_EXISTS_CODE, AccountUtils.ACCOUNT_NOT_EXISTS_MESSAGE, null, null, null);
         }
 
         Account account = accountRepository.findAccountByAccountNumber(accountNumber);
         accountRepository.deleteAccountByAccountNumber(accountNumber);
+        log.info("Account deleted: accountNumber={}", accountNumber);
+
         CustomerDTO customer = customerServiceClient.getCustomerById(account.getCustomerId());
 
         rabbitTemplate.convertAndSend(EXCHANGE_NAME, JSON_ROUTING_KEY, NotificationDTO.builder()
@@ -102,9 +112,13 @@ public class AccountService implements AccountServiceImpl {
     // Update account balance
     public String saveAccount(String accountNumber, BigDecimal balance) {
         Account account = accountRepository.findAccountByAccountNumber(accountNumber);
-        if (account == null) return "account not found";
+        if (account == null) {
+            log.warn("Balance update failed — account not found: {}", accountNumber);
+            return "account not found";
+        }
         account.setBalance(balance);
         accountRepository.save(account);
+        log.info("Balance updated: accountNumber={}, newBalance={}", accountNumber, balance);
         return "updated";
     }
 
